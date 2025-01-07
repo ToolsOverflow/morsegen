@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Morse Audio Test</title>
+  </head>
+  <body>
+    <button id="play">Play Morse</button>
+    <button id="stop">Stop</button>
+    <script type="module">
+      import morse from "../dist/index.esm.js";
+
+      const handlePlay = () => {
+        document.getElementById("play").innerHTML = "Pause Morse";
+      };
+
+      const handlePause = () => {
+        document.getElementById("play").innerHTML = "Play Morse";
+      };
+
+      const morseCode = "sos";
+      const options = {
+        dot: ".",
+        dash: "-",
+        input: "text",
+        volume: 90,
+        fwUnit: 0.04,
+        unit: 0.05,
+        // wpm: 18,
+        oscillator: {
+          type: "sine",
+          frequency: 540,
+          onEnded: () => console.log("Ended Oscillator"),
+        },
+        onPause: handlePause,
+        onPlay: handlePlay,
+        onHeadProgress: (head) => console.log("Current Head", head),
+        onProgress: (gain) => console.log("Current Gain", gain),
+      };
+      let morseAudio = null;
+
+      document.getElementById("play").addEventListener("click", () => {
+        if (!morseAudio) {
+          morseAudio = morse.audio(morseCode, options);
+        }
+        morseAudio.play();
+      });
+
+      document.getElementById("stop").addEventListener("click", () => {
+        if (morseAudio) morseAudio.stop();
+      });
+    </script>
+  </body>
+</html>

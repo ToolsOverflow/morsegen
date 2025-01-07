@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Export Audio</title>
+  </head>
+  <body>
+    <button id="export">Export</button>
+    <script type="module">
+      import morse from "../dist/index.esm.js";
+
+      const morseCode = "... --- ...";
+      let morseAudio = null;
+
+      document.getElementById("export").addEventListener("click", () => {
+        if (!morseAudio) {
+          morseAudio = morse.audio(morseCode, {
+            wpm: 20,
+            oscillator: { frequency: 640 },
+          });
+        }
+
+        // morseAudio.saveWav("morse", { filePicker: true });
+        morseAudio.saveWav("morse", { filePicker: false });
+      });
+    </script>
+  </body>
+</html>
