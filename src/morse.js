@@ -31,7 +31,6 @@ export const encode = (text, options = {}) => {
 
   if (script) {
     const map = mapping[script];
-
     if (!map) return unknown;
 
     morse = [...text.replace(/\s+/g, " ").trim().toUpperCase()]

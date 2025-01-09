@@ -9,12 +9,12 @@
     <script type="module">
       import morse from "../dist/index.esm.js";
 
-      const morseCode = "... --- ...";
+      const text = "SOS";
       let morseAudio = null;
 
       document.getElementById("export").addEventListener("click", () => {
         if (!morseAudio) {
-          morseAudio = morse.audio(morseCode, {
+          morseAudio = morse.audio(text, {
             wpm: 20,
             oscillator: { frequency: 640 },
           });

@@ -4,7 +4,6 @@ import { downloadFile, saveFile } from "./utils.js";
 const getGainValues = (morse, options = {}, currentTime = 0) => {
   let { unit, fwUnit } = { unit: 0.1, fwUnit: 0.1, ...options };
   const spots = [];
-  const nodeData = [];
   let time = 0;
 
   if (options.wpm) {
@@ -12,7 +11,7 @@ const getGainValues = (morse, options = {}, currentTime = 0) => {
   }
 
   const beap = (count) => {
-    const volume = options.volume / 100 || 0.5;
+    const volume = options.volume / 100 || 0.001;
     spots.push([volume, currentTime + time]);
     time += unit * count;
   };
@@ -43,11 +42,11 @@ const getGainValues = (morse, options = {}, currentTime = 0) => {
       gap(3);
       addSilence = false;
     }
-
-    nodeData.push([time, i + 1]);
   }
 
-  return [spots, time, nodeData];
+  spots.push([0, time]);
+
+  return [spots, time];
 };
 
 const audioBufferToWav = (buffer) => {
@@ -95,7 +94,8 @@ const audioBufferToWav = (buffer) => {
 };
 
 const audio = (morse, options = {}) => {
-  options = { dot: ".", dash: "-", input: "morse", ...options };
+  options = { dot: ".", dash: "-", ...options };
+
   let AudioContextClass = window.AudioContext || window.webkitAudioContext;
   let OfflineAudioContextClass =
     window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -104,13 +104,22 @@ const audio = (morse, options = {}) => {
     throw new Error("Web Audio API is not supported in this browser");
   }
 
+  morse = morse.trim();
+
   if (options.input === undefined) {
     morse = encode(morse, options);
   } else {
-    morse = options.input === "morse" ? morse : encode(morse, options);
+    morse = options?.input === "morse" ? morse : encode(morse, options);
   }
 
-  const [gainValues, time, nodeData] = getGainValues(morse, options);
+  morse = morse.replace(/\#/g, "");
+
+  if (morse.trim().length === 0)
+    throw new Error(
+      "Invalid morse code. It should only contain valid characters."
+    );
+
+  const [gainValues, time] = getGainValues(morse, options);
 
   let audioContext = new AudioContextClass();
   let offlineContext = new OfflineAudioContextClass(1, 44100 * time, 44100);
@@ -121,9 +130,12 @@ const audio = (morse, options = {}) => {
   oscillator.type = options?.oscillator?.type || "sine";
   oscillator.frequency.value = options?.oscillator?.frequency || 440;
 
-  gainValues.forEach(([volume, timestamp]) =>
-    gainNode.gain.setValueAtTime(volume, timestamp)
-  );
+  gainValues.forEach(([volume, timestamp], index) => {
+    const fadeDuration = 0.005;
+    if (index === 0 || gainValues[index - 1][0] !== volume) {
+      gainNode.gain.setTargetAtTime(volume, timestamp, fadeDuration);
+    }
+  });
 
   oscillator.connect(gainNode);
   gainNode.connect(offlineContext.destination);
@@ -155,24 +167,12 @@ const audio = (morse, options = {}) => {
   });
 
   const findIndex = () => {
-    let currentTime = (Date.now() - startAt) / 1000;
+    const elapsed = (Date.now() - startAt) / 1000;
 
-    if (currentTime) {
-      const index = nodeData.findIndex(
-        ([timestamp, _]) => timestamp > currentTime
-      );
+    const index = gainValues.findIndex((node) => node[1] >= elapsed);
 
-      const grainIndex = gainValues.findIndex(
-        ([_, timestamp]) => timestamp > currentTime
-      );
-
-      if (nodeData[index]) {
-        options?.onHeadProgress && options?.onHeadProgress(nodeData[index]);
-      }
-
-      if (gainValues[grainIndex]) {
-        options?.onProgress && options?.onProgress(gainValues[grainIndex]);
-      }
+    if (index !== -1) {
+      options?.onNextGain && options?.onNextGain(gainValues[index]);
     }
   };
 
@@ -239,6 +239,7 @@ const audio = (morse, options = {}) => {
       source.stop();
       pauseTime = Date.now() - startAt;
       isPlaying = false;
+
       options?.onPause && options?.onPause();
     }
   };
@@ -273,15 +274,24 @@ const audio = (morse, options = {}) => {
     }
   };
 
+  const close = () => {
+    stop();
+    audioContext.close();
+  };
+
   return {
     play,
     pause,
     stop,
+    close,
     audioContext,
     oscillator,
     gainNode,
     getWavData,
     saveWav,
+    render,
+    getRenderedBuffer: () => renderedBuffer,
+    getGainValues: () => gainValues,
   };
 };
 
